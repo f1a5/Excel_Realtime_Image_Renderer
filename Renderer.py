@@ -1,35 +1,49 @@
 from PIL import Image
 import numpy as np
 import xlwings as xw
-
-wb = xw.Book(r'C:\Users\Saif Qadeer\PycharmProjects\Excel_Image_Renderer\Output\output.xlsx')
-sht = wb.sheets['Sheet1']
-Img = Image.open("test.jpg",'r')
-Pixel_Color = list(Img.getdata())
-s=(360,480,3)
-Pix = np.zeros(s)
-print(Pixel_Color)
-dict = {0:'A',1:'B',2:'C',3:'D',4:'E',5:'F',6:'G',7:'H',8:'I',9:'J',10:'K',11:'L',12:'M',13:'N',14:'O',15:'P',16:'Q',
-        17:'R',18:'S',19:'T',20:'U',21:'V',22:'W',23:'X',24:'Y',25:'Z'}
+from Configuration import *
 
 
-def GetCellAdd(rows,columns):
-    quotienty = columns//26
-    remaindery = columns%26
-    if (quotienty==0):
-        return "{0}{1}".format(dict[remaindery],str(rows+1))
+def CellColumnString(columns):
+    # convert the column index of the image array to a corresponding string. It is needed to convert the indexes to
+    # corresponding column address in Excel
+    if columns < 26:
+        return "{0}".format(ALPHABETS[columns])
     else:
-        return "{0}{1}".format(dict[quotienty-1]+dict[remaindery], str(rows + 1))
+        return CellColumnString((columns // 26) - 1) + ALPHABETS[columns % 26]
 
 
-for row in range(0,359):
-        for col in range(0,479):
-            for i in range (0,3):
-                Pix[row, col, i]= Pixel_Color[row * 480 + col][i]
-
-for x in range(0,479):
-        for y in range(0,359):
-            Cell = GetCellAdd(y,x)
-            sht.range(Cell).color = (Pix[y, x, 0], Pix[y, x, 1], Pix[y, x, 2])
+def GetCellAddress(rows, columns):
+    # Generate cell adress for a particular element in array
+    return CellColumnString(columns) + str(rows + 1)
 
 
+def ImageToArray(PathToImage):
+    # Load the image into memory and read the pixel values into a numpy array
+    Img = Image.open(PathToImage, 'r')
+    Pixel_Color = list(Img.getdata())
+    # read value of image resolution
+    (width, height) = Img.size
+    # make 3D array in order to store 3 color values corresponding to each pixel
+    PixelArray = np.zeros((height, width, 3))
+    for row in range(0, height - 1):
+        for col in range(0, width - 1):
+            for i in range(0, 3):
+                PixelArray[row, col, i] = Pixel_Color[row * width + col][i]
+
+    return PixelArray
+
+
+def Render(ColorArray, PathToOutput):
+    # read the color values from color array (formed in previous function) and fill the corresponding cells in the target
+    # Excel file
+    file = xw.Book(PathToOutput)
+    Sheet = file.sheets['Sheet1']
+    for x in range(0, ColorArray.shape[0] - 1):
+        for y in range(0, ColorArray.shape[1] - 1):
+            Cell = GetCellAddress(x, y)
+            Sheet.range(Cell).color = (ColorArray[x, y, 0], ColorArray[x, y, 1], ColorArray[x, y, 2])
+
+
+if __name__ == "__main__":
+    Render(ImageToArray(PATH_TO_INPUT), PATH_TO_OUTPUT)
